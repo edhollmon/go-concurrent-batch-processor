@@ -1,6 +1,6 @@
 # go-concurrent-batch-processor
 
-A CLI tool for seeding and batch-processing large CSV datasets into SQLite.
+A CLI tool for seeding large CSV datasets into SQLite and running concurrent batch analysis over them.
 
 ## Requirements
 
@@ -34,6 +34,23 @@ Output:
 ```
 INFO Seeding Database...
 INFO Seeding complete total=896000 duration=4.2s
+```
+
+#### `countname`
+
+Queries `people.db` and finds the letter of the alphabet that the most first names start with. Work is distributed across a pool of 4 concurrent goroutines, each processing batches of 50,000 rows, with results aggregated into a final tally.
+
+Requires `people.db` to exist — run `seed` first.
+
+```bash
+./batch-processor countname
+```
+
+Output:
+```
+INFO Processing names...
+INFO starting total_rows=896000 batch_size=50000 workers=4
+INFO done letter=J count=72381
 ```
 
 ## Data Model
