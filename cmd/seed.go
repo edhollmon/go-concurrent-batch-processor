@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"database/sql"
-	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -26,9 +26,9 @@ type person struct {
 var seedCmd = &cobra.Command{
 	Use:   "seed",
 	Short: "Seed SQL DB with sample cvs data",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Seeding Database...")
-		seed()
+	RunE: func(cmd *cobra.Command, args []string) error {
+		slog.Info("Seeding Database...")
+		return seed()
 	},
 }
 
@@ -36,29 +36,31 @@ func init() {
 	rootCmd.AddCommand(seedCmd)
 }
 
-func seed() {
+func seed() error {
 	start := time.Now()
 
 	peopleFile, err := os.OpenFile("people-896000.csv", os.O_RDWR|os.O_CREATE, os.ModePerm)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer func() {
 		if err := peopleFile.Close(); err != nil {
-			panic(err)
+			slog.Error("failed to close people file", "error", err)
 		}
 	}()
 
 	people := []*person{}
 	if err := gocsv.UnmarshalFile(peopleFile, &people); err != nil {
-		panic(err)
+		return err
 	}
 
-	os.Remove("people.db")
+	if err := os.Remove("people.db"); err != nil && !os.IsNotExist(err) {
+		return err
+	}
 
 	db, err := sql.Open("sqlite", "people.db")
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer db.Close()
 
@@ -74,29 +76,31 @@ func seed() {
 		job_title TEXT
 	)`)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	tx, err := db.Begin()
 	if err != nil {
-		panic(err)
+		return err
 	}
 	stmt, err := tx.Prepare(`INSERT INTO people (index_col, user_id, first_name, last_name, sex, email, phone, dob, job_title)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
-		panic(err)
+		tx.Rollback()
+		return err
 	}
 	defer stmt.Close()
 
 	for _, p := range people {
 		if _, err := stmt.Exec(p.Index, p.UserID, p.FirstName, p.LastName, p.Sex, p.Email, p.Phone, p.Dob, p.JobTitle); err != nil {
-			panic(err)
+			tx.Rollback()
+			return err
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		panic(err)
+		return err
 	}
 
-	fmt.Println("Total:", len(people))
-	fmt.Println("Time:", time.Since(start))
+	slog.Info("Seeding complete", "total", len(people), "duration", time.Since(start))
+	return nil
 }
