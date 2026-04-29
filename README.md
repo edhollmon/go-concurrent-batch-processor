@@ -9,7 +9,7 @@ A CLI tool for seeding and batch-processing large CSV datasets into SQLite.
 ## Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/edhollmon/go-concurrent-batch-processor
 cd go-concurrent-batch-processor
 go build -o batch-processor .
 ```
